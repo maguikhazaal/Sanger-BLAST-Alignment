@@ -1,0 +1,136 @@
+javascript:(function(){
+  function extractAndLogTextSequence() {
+    const textSequence = document.querySelector('pre.text_sequence');
+
+    // Special NTs
+    const lookupTable = {
+      'R': 'R (A/G)',
+      'Y': 'Y (C/T)',
+      'S': 'S (G/C)',
+      'W': 'W (A/T)',
+      'K': 'K (G/T)',
+      'M': 'M (A/C)',
+      'B': 'B (C/G/T)',
+      'D': 'D (A/G/T)',
+      'H': 'H (A/C/T)',
+      'V': 'V (A/C/)G'
+    };
+    
+    if (textSequence) {
+      const content = textSequence.textContent.trim();
+      const lines = content.split('\n');
+      
+      if (lines.length >= 3) {
+        // Extract initial information
+        const firstLine = lines[0].trim();
+        const firstLineNumbers = firstLine.substring(0, 24).trim();
+        const nameSample = firstLineNumbers.split(':')[0].trim()
+        const startNTSample = parseInt(firstLineNumbers.split(':')[1].trim(), 10);
+
+        const thirdLine = lines[2].trim();
+        const firstNumbers = thirdLine.substring(0, 24).trim();
+        const [chromosome, startNTRef] = firstNumbers.split(':').map(num => parseInt(num.trim(), 10));
+        
+        const lastLine = lines[lines.length - 1].trim();
+        const lastNumbers = lastLine.slice(-24).trim();
+        const endNTRef = parseInt(lastNumbers.split(':')[1].trim(), 10);
+
+        const direction = Math.sign(endNTRef - startNTRef);
+        
+        const mismatches = [];
+
+        // Iterate over sets of four lines
+        for (let i = 0; i < lines.length; i += 4) {
+          if (i + 2 >= lines.length) break;  // Ensure we have enough lines
+
+          const sampleLine = lines[i].substring(24, 85);
+          const alignmentLine = lines[i + 1].substring(24, 85);
+          const referenceLine = lines[i + 2].substring(24, 85);
+
+          const currentStartNTSample = parseInt(lines[i].substring(0, 24).split(':')[1].trim(), 10);
+          const currentStartNTRef = parseInt(lines[i + 2].substring(0, 24).split(':')[1].trim(), 10);
+
+          // Find mismatches
+          for (let j = 0; j < alignmentLine.length; j++) {
+            if (alignmentLine[j] === ' ') {
+              let sampleChar = sampleLine[j];
+              const refChar = referenceLine[j];
+
+              // Replace sampleChar with its corresponding value from the look-up table if it exists
+              if (lookupTable.hasOwnProperty(sampleChar)) {
+                sampleChar = lookupTable[sampleChar];
+              }
+              
+              // Only add mismatch if both characters are not whitespace
+              if (sampleChar.trim() !== '' && refChar.trim() !== '') {
+                mismatches.push({
+                  sampleNT: currentStartNTSample + j,
+                  refNT: currentStartNTRef + (direction * j),
+                  sampleChar: sampleChar,
+                  refChar: refChar
+                });
+              }
+            }
+          }
+        }
+
+        // Create tab-separated values string
+        //const tsvContent = mismatches.map(m => 
+        //  `${nameSample}\t\t\t\t${m.sampleNT}\tchr${chromosome}:${m.refNT}\t${m.sampleChar}\t${m.refChar}\t\t${startNTRef}\t${endNTRef}`
+        //).join('\n');
+
+        // Create tab-separated values string
+        let tsvContent;
+        if (mismatches.length === 0) {
+          tsvContent = `${nameSample}\t\t\tchr${chromosome}:${startNTRef}\tchr${chromosome}:${endNTRef}`
+        }
+        else {
+          tsvContent = mismatches.map((m, index) => 
+          `${index === 0 ? nameSample : ''}\t\t\t${index === 0 ? `chr${chromosome}:${startNTRef}` : ''}\t${index === 0 ? `chr${chromosome}:${endNTRef}` : ''}\t\t${m.sampleNT}\tchr${chromosome}:${m.refNT}\t${m.sampleChar}\t${m.refChar}`
+          ).join('\n');
+        }
+
+        const button = document.createElement('button');
+        button.textContent = 'Copy to Clipboard!'
+        button.style.position = 'fixed';
+        button.style.top = '200px';
+        button.style.left = '200px';
+        button.style.width = '100px';
+        button.style.height = '50px';
+        button.style.zIndex = 10000;
+        //button.style.opacity = 0; // Make the button invisible
+        document.body.appendChild(button);
+
+        // Add a click event listener to the button
+        button.addEventListener('click', function() {
+            navigator.clipboard.writeText(tsvContent).then(() => {
+              console.log('Mismatches copied to clipboard as TSV');
+            }).catch(err => {
+              console.error('Failed to copy mismatches to clipboard:', err);
+            });
+            document.body.removeChild(button); // Remove the button after use
+        });
+
+        // Programmatically trigger a click event on the button
+        //button.click();
+
+        console.log('Content of text_sequence:');
+        console.log(content);
+        console.log('Extracted information:');
+        console.log('Sample Name:', nameSample);
+        console.log('Chromosome:', chromosome);
+        console.log('Start NT Sample:', startNTSample);
+        console.log('Start NT Ref:', startNTRef);
+        console.log('End NT Ref:', endNTRef);
+        console.log('Direction:', direction);
+        console.log('Mismatches:', mismatches);
+      } else {
+        console.log('The text_sequence does not have at least 4 lines.');
+      }
+    } else {
+      console.log('No element with class "text_sequence" found.');
+    }
+  }
+  
+  extractAndLogTextSequence();
+})();
