@@ -1,0 +1,116 @@
+javascript: (function () {
+    // Helper function to replace a character in a specific line and position with highlighted version
+    function replaceCharWithHighlight(content, lineIndex, start) {
+        const lines = content.split('\n');
+        const line = lines[lineIndex];
+        const charToHighlight = line.substring(start, start+1);
+
+        const highlightedChar = `<span style="background-color: orange;">${charToHighlight}</span>`;
+        const newLine = line.substring(0, start) + highlightedChar + line.substring(start+1);
+
+        lines[lineIndex] = newLine;
+        return lines.join('\n');
+    }
+
+    // Helper function to restore original colors
+    function replaceCharWithColor(content, lineIndex, start) {
+        const lines = content.split('\n');
+        const line = lines[lineIndex];
+        const charToColor = line.substring(start, start+1);
+
+        const coloredChar = `<span style="color:#dd0000">${charToColor}</span>`;
+        const newLine = line.substring(0, start) + coloredChar + line.substring(start+1);
+
+        lines[lineIndex] = newLine;
+        return lines.join('\n');
+    }
+
+    // Helper function to download the content as a file
+    function downloadContent(content, filename) {
+        const blob = new Blob([content], { type: 'text/html' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function highlightSanger() {
+        const textSequence = document.querySelector('pre.text_sequence');
+
+
+        if (textSequence) {
+            const content = textSequence.textContent.trim();
+            const lines = content.split('\n');
+            let highlightedContent = content; // Start with the original content
+
+            // Name of the sample (for naming the downloadable file)
+            const nameSample = lines[0].substring(0, 24).split(':')[0].trim()
+
+            if (lines.length >= 3) {
+                const mismatches = [];
+
+                // Iterate over sets of four lines
+                for (let i = 0; i < lines.length; i += 4) {
+                    if (i + 2 >= lines.length) break; // Ensure we have enough lines
+
+                    const sampleLine = lines[i].substring(24, 85);
+                    const alignmentLine = lines[i + 1].substring(24, 85);
+                    const referenceLine = lines[i + 2].substring(24, 85);
+
+                    // Find mismatches
+                    for (let j = 0; j < alignmentLine.length; j++) {
+                        if (alignmentLine[j] === ' ') {
+                            let sampleChar = sampleLine[j];
+                            const refChar = referenceLine[j];
+
+                            // Only add mismatch if both characters are not whitespace
+                            if (sampleChar.trim() !== '' && refChar.trim() !== '') {
+                                mismatches.push({
+                                    lineIndex: i,
+                                    position: j,
+                                    sampleChar: sampleChar,
+                                    refChar: refChar
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // Sort mismatches by line and position, from last to first to avoid indexing issues when replacing characters
+                mismatches.sort((a, b) => b.lineIndex - a.lineIndex || b.position - a.position);
+
+                // Highlight mismatches in the content
+                mismatches.forEach(m => {
+                    const startIndex = 24 + m.position;
+                    // Replace the mismatched character in the sample line
+                    highlightedContent = replaceCharWithHighlight(highlightedContent, m.lineIndex, startIndex);
+                    // Replace the mismatched character in the aligment line
+                    highlightedContent = replaceCharWithHighlight(highlightedContent, m.lineIndex+1, startIndex);
+                    // Replace the mismatched character in the reference line
+                    highlightedContent = replaceCharWithHighlight(highlightedContent, m.lineIndex+2, startIndex);
+                });
+
+                
+                // Wrap highlighted content in <pre> tags
+                highlightedContent = `<pre>${highlightedContent}</pre>`;
+
+                // Trigger download of the content as an HTML file
+                downloadContent(highlightedContent, `${nameSample}_highlighted.html`);
+
+                console.log('Content of text_sequence:');
+                console.log(content);
+                console.log('Extracted information:');
+                console.log('Mismatches:', mismatches);
+                console.log('Highlighted content:', highlightedContent)
+            } else {
+                console.log('The text_sequence does not have at least 4 lines.');
+            }
+        } else {
+            console.log('No element with class "text_sequence" found.');
+        }
+    }
+
+    highlightSanger();
+})();
